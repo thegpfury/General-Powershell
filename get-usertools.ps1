@@ -16,7 +16,6 @@
 # This will pull the list of users from C:\users.txt, export datagrid with the details, as well as saving a CSV of the details found.
 # You can mix and match displaynames, SIDs, and usernames in this text file, it will iterate through and see what it can find. 
 #
-
 param(
 [string]$fullname = "",
 [string]$filename = "",
@@ -24,7 +23,6 @@ param(
 [string]$csv = ""
 )
 $userlist1 = @() 
-
 # Grab-Info function will iterate through searching for SID, Displayname and Username for the username, settling on whatever is found first. 
 function Grab-Info($search)
     {
@@ -38,8 +36,7 @@ function Grab-Info($search)
         $nametest = get-aduser -LDAPFilter "(name=$search)" -properties *
         }
     return $nametest
-}
-
+    }
 # Write-Info function will create a psobject, and store the data that is grabbed. Future versions will allow a user to select more properties to grab.
 function Write-info($details,$found)
     {
@@ -61,11 +58,9 @@ function Write-info($details,$found)
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Email" -Value $details.EmailAddress
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Modified" -Value $details.Modified
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Groups" -Value $groupstring
-       
-    }
+        }
     else
-    {
-
+        {
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "UserName" -Value $details
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "FullName" -Value "Not Found"
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "SID" -Value "Not Found"
@@ -73,12 +68,9 @@ function Write-info($details,$found)
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Email" -Value "Not Found"
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Modified" -Value "Not Found"
         Add-Member -InputObject $fundetails -MemberType NoteProperty -Name "Groups" -Value "Not Found"
-        
-
-    }
+        }
     return $fundetails
     }
-
 # Parse-Info function will iterate through the file or username details and find details.
 function Parse-info($parser)
     {
@@ -96,17 +88,16 @@ function Parse-info($parser)
             }
             else
             {
-               $fundetails2 = write-info $user 0
+                $fundetails2 = write-info $user 0
                 $userlist += $fundetails2
             }
         }
         return $userlist
     }
-
 # A check to ensure that active directory module is loaded
 if(!(get-module activedirectory))
     {
-    import-module activedirectory
+        import-module activedirectory
     }
 # Simple search if there is not a filename.
 if(!($filename))
@@ -129,33 +120,29 @@ if(!($filename))
             Write-host "Failed Item: $failed1"
         }
 if($filelist)
-{
-    $userlist1 = parse-info $filelist
-    $userlist1 | format-table
-    if($grid) 
     {
-           # If the DG option is true, it will output the full user list as a datagrid.
-            #$csv = $userlist1  | export-csv -path c:\pstemp\users.csv
+        $userlist1 = parse-info $filelist
+        $userlist1 | format-table
+        if($grid) 
+        {
+            # If the DG option is true, it will output the full user list as a datagrid.
             $userlist1 | Out-GridView
-    }
-    if($csv) 
-    {
-           # If the CSV option has a path, it will export a CSV with the user details
-            
-            try
-            {
-                $csv = $userlist1  | export-csv -path $csv
-
-            }
-            catch 
-            {
-                $Error1 = $_.Exception.Message
-                $Failed1 = $_.Exception.ItemName
-                Write-host "Error: $error1" 
-                Write-host "Failed Item: $failed1"
-            }
-
-    }
-
+        }
+        if($csv) 
+        {
+            # If the CSV option has a path, it will export a CSV with the user details
+                
+                try
+                {
+                    $csv = $userlist1  | export-csv -path $csv
+                }
+                catch 
+                {
+                    $Error1 = $_.Exception.Message
+                    $Failed1 = $_.Exception.ItemName
+                    Write-host "Error: $error1" 
+                    Write-host "Failed Item: $failed1"
+                }
+        }
     }
 }
