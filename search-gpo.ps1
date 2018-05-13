@@ -7,10 +7,13 @@ param (
 [bool]$getgpo = 0, # This saves all the GPO's in your AD to the specified path. If you already saved it, make this a 0 to save time.
 [string]$xmlPath = "c:\pstemp\all.xml", # Where to save XML, as well as where to read XML
 # Policy list is a list of strings for Policy settings that you want to check if enabled or not
-[array]$policylist = @("Disable the Connections page","Prohibit access to the Control Panel","Add/Delete items","Prevent access to the command prompt","Remove Task Manager","Prevent changing proxy settings","Prohibit adding items","prohibit closing items"),
+[array]$policylist = @("Password Protect the Screen saver","Disable the Connections page","Prohibit access to the Control Panel","Add/Delete items","Prevent access to the command prompt","Remove Task Manager","Prevent changing proxy settings","Prohibit adding items","prohibit closing items"),
 # Reglist is a list of registry settings that you want to pull. Please note that this script will disregard any entries flagged with "D"
 # This will prevent showing entries that are configured to delete existing registry entries
-[array]$reglist = @("ProxyOverride","AutoConfigURL","ProxyServer")
+[array]$reglist = @("ProxyOverride","AutoConfigURL","ProxyServer"),
+# This uses colon separated values to store a GPO policy that has an affiliated setting
+# Yes, this is ugly. But, it works. 
+[array]$policyedlist = @("Force specific screen saver:edittext:value","Screen saver Timeout:numeric:value","Hide These Specified Drives in My Computer:Dropdownlist:Value")
 )
 
 function CheckSettings($registry)
@@ -47,17 +50,6 @@ function DirectGrab($Grab)
     if($Grab)
     {
     return $Grab
-    }
-    else
-    {
-    return ""
-    }
-}
-function CheckPolicyED($PolicyED)
-{
-    if($PolicyED)
-    {
-    return $policyed.State, $PolicyED.edittext.value
     }
     else
     {
@@ -136,18 +128,31 @@ foreach($gpo in $all.report.gpo)
     }
 
     # Check for Enforced SCR
-    $forcedscr = checkpolicyed($gpo.user.extensiondata.extension.policy | where {$_.name -eq "Force specific screen saver"})
-    if ($forcedscr)
+    foreach($policyed1 in $policyedlist)
     {
-        Add-Member -inputObject $array -memberType NoteProperty -name “SCR-Forced” -value $forcedscr[0]
-        Add-Member -inputObject $array -memberType NoteProperty -name “SCR” -value $forcedscr[1]
+        $edpolname, $edvalue, $edpolicy = ($policyed1 -split(':'))
+        $edname = "$edpolname $edvalue $edpolicy"
+        $currentpolicyed = $gpo.user.extensiondata.extension.policy | where {$_.name -eq $edpolname}
+        if ($currentpolicyed)
+        {
+                  
+            Add-Member -inputObject $array -memberType NoteProperty -name $edpolname -value $currentpolicyed.State
+            # Ugly Hack to deal with the 4th point in dropdown list. Gonna see if this breaks more
+            if($edvalue -like "DropDownList")
+            {
+            Add-Member -inputObject $array -memberType NoteProperty -name $edname -value $currentpolicyed.$edvalue.$edpolicy.name
+            }    
+            else 
+            {
+                Add-Member -inputObject $array -memberType NoteProperty -name $edname -value $currentpolicyed.$edvalue.$edpolicy
+            }
+        }
+        else
+        {
+            Add-Member -inputObject $array -memberType NoteProperty -name $edpolname -value "N/A"
+            Add-Member -inputObject $array -memberType NoteProperty -name $edname  -value "N/A"
+        }
     }
-    else
-    {
-        Add-Member -inputObject $array -memberType NoteProperty -name “SCR-Forced” -value "N/A"
-        Add-Member -inputObject $array -memberType NoteProperty -name “SCR” -value "N/A"
-    }
-
     # Check for Faves
     $favearray1 = grabfavorites($gpo.user.extensiondata.extension.favoriteurl)
     if ($favearray1)
