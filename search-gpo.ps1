@@ -16,46 +16,6 @@ param (
 [array]$policyedlist = @("Force specific screen saver:edittext:value","Screen saver Timeout:numeric:value","Hide These Specified Drives in My Computer:Dropdownlist:Value")
 )
 
-function CheckSettings($registry)
-{
-    if($registry)
-    {
-        if($registry.action -eq "D")
-        {
-        return ""
-        }
-        elseif($registry.action -ne "D")
-        {
-        return $registry.value
-        }
-    }
-    else
-    {
-    return ""
-    }
-}
-function CheckPolicy($Pol)
-{
-    if($Pol)
-    {
-    return $Pol.State
-    }
-    else
-    {
-    return ""
-    }
-}
-function DirectGrab($Grab)
-{
-    if($Grab)
-    {
-    return $Grab
-    }
-    else
-    {
-    return ""
-    }
-}
 function GrabFavorites($faves)
 {
     if($faves)
@@ -92,10 +52,14 @@ foreach($gpo in $all.report.gpo)
     # Check for the registry settings
     foreach($reg in $reglist)
     {
-    $registryset = checksettings($gpo.user.ExtensionData.extension.registrysettings.collection.collection.collection.collection.collection.collection.collection.registry.properties | where {$_.name -eq $reg})
+    $registryset = $gpo.user.ExtensionData.extension.registrysettings.collection.collection.collection.collection.collection.collection.collection.registry.properties | where {$_.name -eq $reg}   
+    
     if ($registryset)
         {
-        Add-Member -inputObject $array -memberType NoteProperty -name $reg -value $registryset
+        if($registryset.action -ne "D")
+            {
+                Add-Member -inputObject $array -memberType NoteProperty -name $reg -value $registryset.value
+            }
         }
     else
         {
@@ -106,10 +70,10 @@ foreach($gpo in $all.report.gpo)
     # Check for policys
     foreach($policy in $policylist)
     {
-        $currentpolicy = checkpolicy($gpo.user.extensiondata.extension.policy | where {$_.name -eq "$policy"})
+        $currentpolicy = $gpo.user.extensiondata.extension.policy | where {$_.name -eq "$policy"}
         if($currentpolicy)
         {
-            Add-Member -inputObject $array -memberType NoteProperty -name $policy -value $currentpolicy
+            Add-Member -inputObject $array -memberType NoteProperty -name $policy -value $currentpolicy.state
         }
         else
         {
@@ -117,7 +81,7 @@ foreach($gpo in $all.report.gpo)
         }
     }   
     # Check for PAC file -> IE Setting
-    $pacIE = directgrab($gpo.user.extensiondata.extension.automaticconfiguration.proxyurl)
+    $pacIE = $gpo.user.extensiondata.extension.automaticconfiguration.proxyurl
     if ($pacIE)
     {
         Add-Member -inputObject $array -memberType NoteProperty -name “PacIE” -value $pacIE
@@ -127,7 +91,8 @@ foreach($gpo in $all.report.gpo)
         Add-Member -inputObject $array -memberType NoteProperty -name “PacIE” -value "N/A"
     }
 
-    # Check for Enforced SCR
+    # Check for policies with values 
+    # Ugly hacks ahead!
     foreach($policyed1 in $policyedlist)
     {
         $edpolname, $edvalue, $edpolicy = ($policyed1 -split(':'))
